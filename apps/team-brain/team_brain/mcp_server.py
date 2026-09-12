@@ -66,16 +66,18 @@ mcp = FastMCP("team-brain", host=MCP_HOST, port=MCP_PORT)
 _TOKEN_ENV = "TEAM_BRAIN_TOKEN"
 
 
-def _token_from_request(ctx: Context[Any, Any, Any] | None) -> str | None:
-    """Bearer token from the HTTP request, when running over HTTP."""
+def _http_request(ctx: Context[Any, Any, Any] | None) -> Any | None:
+    """The HTTP request behind this tool call, or None on the stdio transport."""
     if ctx is None:
         return None
     try:
-        request = ctx.request_context.request
+        return ctx.request_context.request
     except (AttributeError, ValueError):
         return None
-    if request is None:
-        return None
+
+
+def _token_from_request(request: Any) -> str | None:
+    """Bearer token from an HTTP request; None when the header is absent or malformed."""
     header = request.headers.get("authorization", "")
     if header.lower().startswith("bearer "):
         return header[7:].strip()
@@ -83,13 +85,26 @@ def _token_from_request(ctx: Context[Any, Any, Any] | None) -> str | None:
 
 
 def _identity_for(ctx: Context[Any, Any, Any] | None) -> Identity:
-    """HTTP: the request's bearer token. stdio: TEAM_BRAIN_TOKEN. Neither: anonymous.
+    """HTTP: the request's bearer token, nothing else. stdio: TEAM_BRAIN_TOKEN. Neither: anonymous.
 
+    Over HTTP the process environment is never consulted: a request without a
+    bearer header is anonymous even if the operator exported a token for stdio.
     Anonymous is a real identity with no grant: public, company-wide rows only.
     A supplied-but-unknown token is refused by the database, never downgraded.
     """
-    token = _token_from_request(ctx) or os.environ.get(_TOKEN_ENV, "").strip()
+    request = _http_request(ctx)
+    if request is not None:
+        token = _token_from_request(request)
+    else:
+        token = os.environ.get(_TOKEN_ENV, "").strip() or None
     return Identity.token(token) if token else Identity.anonymous()
+
+
+_MAX_LIMIT = 50
+
+
+def _clamp(limit: int) -> int:
+    return max(1, min(int(limit), _MAX_LIMIT))
 
 
 @contextmanager
@@ -142,7 +157,7 @@ def search(
 ) -> list[dict[str, Any]]:
     """Search the team knowledge base across all sources you're permitted to see."""
     with _session(ctx) as db:
-        return [e.to_row() for e in _search(query, project=project, limit=limit, db=db)]
+        return [e.to_row() for e in _search(query, project=project, limit=_clamp(limit), db=db)]
 
 
 @mcp.tool()

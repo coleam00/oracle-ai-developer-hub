@@ -57,7 +57,6 @@ APP_USER = os.getenv("ORACLE_USER", "TEAMBRAIN").upper()
 APP_PASSWORD = os.getenv("ORACLE_PASSWORD", "TeamBrain123")
 TEST_USER = os.getenv("ORACLE_USER_TEST", f"{APP_USER}_TEST").upper()
 TEST_PASSWORD = os.getenv("ORACLE_PASSWORD_TEST", APP_PASSWORD)
-ONNX_DIR_PATH = os.getenv("ONNX_CONTAINER_DIR", "/opt/oracle/onnx_models")
 ONNX_FILE = os.getenv("ONNX_FILENAME", "all_MiniLM_L12_v2.onnx")
 MODEL_NAME = os.getenv("EMBEDDING_MODEL", "ALL_MINILM_L12_V2")
 
@@ -87,7 +86,7 @@ def ensure_user(cur: oracledb.Cursor, user: str, password: str) -> None:
         print(f"  user {user}: exists")
     else:
         cur.execute(
-            f'CREATE USER {user} IDENTIFIED BY "{password}" '
+            f'CREATE USER {user} IDENTIFIED BY "{password.replace(chr(34), chr(34) * 2)}" '
             "DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS"
         )
         print(f"  user {user}: created")

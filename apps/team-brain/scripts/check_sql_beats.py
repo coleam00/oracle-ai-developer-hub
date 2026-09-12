@@ -1,6 +1,7 @@
-"""The SQL-client beats of the video, run exactly as scripted against the dev schema.
+"""The SQL-client walkthrough from the README, run statement by statement against the dev schema.
 
-Prints what each statement returns so the record kit can carry expected output.
+Prints what each statement returns: zero rows with no identity, ORA-01031 on a direct
+SET_CONTEXT, the per-principal counts, the embedding dimension, and the domain labels.
 """
 
 from __future__ import annotations

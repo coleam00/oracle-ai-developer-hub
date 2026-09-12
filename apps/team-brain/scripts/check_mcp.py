@@ -3,7 +3,7 @@
 Asserts, per identity, that the tools return raw evidence rows (not answers) and
 that the row policy holds through the protocol: jeff never sees sales, an
 unknown bearer token is refused, and no token means public-only rows.
-Runs against the TEST schema (seeded by scripts/_parity.py + access seed).
+Runs against the TEST schema, which it seeds itself.
 """
 
 from __future__ import annotations

@@ -17,12 +17,12 @@ per `engineering/onboarding-guide.md`.
 
 ## Current rotation (Q3 2026)
 
-| Week of | Primary | Secondary |
-|---|---|---|
-| 2026-09-01 | Alice | Dave |
-| 2026-09-08 | Dave | Carla |
-| 2026-09-15 | Jeff | Alice |
-| 2026-09-22 | Carla | Jeff |
+| Week of    | Primary | Secondary |
+| ---------- | ------- | --------- |
+| 2026-09-01 | Alice   | Dave      |
+| 2026-09-08 | Dave    | Carla     |
+| 2026-09-15 | Jeff    | Alice     |
+| 2026-09-22 | Carla   | Jeff      |
 
 Jeff covers infra-only pages (autoscaler, cluster capacity — see
 `ops/infra-capacity-planning.md`); billing-service and ledger-core pages

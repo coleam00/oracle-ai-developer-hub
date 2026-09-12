@@ -277,3 +277,56 @@ async def test_get_document_returns_full_text_and_respects_policy(
     # The same row by id, as sales: not found (the policy hides it, indistinguishably)
     hidden = _rows_dict(await _call_raw("get_document", {"row_id": row_id}, token=tokens["sam"]))
     assert hidden["found"] is False
+
+
+async def test_streamable_http_no_header_is_anonymous(tokens: dict[str, str]) -> None:
+    """The HTTP transport never inherits the process token: no bearer header -> anonymous."""
+    import httpx
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
+    port = _free_port()
+    env = _server_env(tokens["brian"])  # exported for stdio; must be ignored over HTTP
+    env["TEAM_BRAIN_TRANSPORT"] = "streamable-http"
+    env["TEAMBRAIN_MCP_PORT"] = str(port)
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "team_brain.mcp_server"],
+        cwd=str(REPO_DIR),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        url = f"http://127.0.0.1:{port}/mcp"
+
+        async def _try_once() -> dict[str, Any]:
+            async with httpx.AsyncClient() as http_client:
+                async with streamable_http_client(url, http_client=http_client) as (
+                    read,
+                    write,
+                    _get_sid,
+                ):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        return _rows_dict(await session.call_tool("whoami", {}))
+
+        deadline = time.monotonic() + 20
+        last_exc: Exception | None = None
+        payload: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            try:
+                payload = await asyncio.wait_for(_try_once(), timeout=10)
+                break
+            except Exception as exc:  # noqa: BLE001 - server still starting up
+                last_exc = exc
+                await asyncio.sleep(0.5)
+        if payload is None:
+            pytest.fail(f"streamable-http server never became ready: {last_exc}")
+        assert payload["username"] == "anonymous"
+        assert payload["domains"] == []
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()

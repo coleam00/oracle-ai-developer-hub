@@ -1,8 +1,8 @@
-"""The two agent questions from the video (beats 10 and 11), against the DEV schema, live model.
+"""Live-model check of the demo questions against the DEV schema.
 
-Loads an OpenRouter key from Cole's content-engine env file at runtime (the key
-never enters the terminal). Expects the dev schema in record-kit order:
-markdown, base Slack export, access seed, domain Slack export.
+Needs an LLM key in the environment or in `.env` (LLM_API_KEY or OPENROUTER_API_KEY).
+Expects the dev schema seeded in README order: markdown, base Slack export,
+access seed, domain Slack export.
 """
 
 from __future__ import annotations
@@ -12,12 +12,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-for candidate in (
-    Path(r"C:\Users\colem\dynamous-engine\content-engine\.env"),
-    Path.home() / ".archon" / ".env",
-):
-    if candidate.exists():
-        load_dotenv(candidate, override=False)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 os.environ.setdefault("ORACLE_USER", "TEAMBRAIN")
 
 from team_brain.access import Identity  # noqa: E402

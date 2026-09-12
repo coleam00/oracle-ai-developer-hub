@@ -54,9 +54,7 @@ the library's own public extension point) drive it through the exact same
 upsert + single tombstone pass as any other connector, just with correct
 per-file domains and exactly one tombstone call for the whole tree.
 
-This IS possible without touching team_brain/ — see the report printed by
-`--report-only` below (or the task's final report) for confirmation there
-was no dead end here.
+`--report-only` prints the plan without writing anything.
 """
 
 from __future__ import annotations

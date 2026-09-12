@@ -16,7 +16,7 @@ services:
     ports:
       - "1521:1521"
     environment:
-      ORACLE_PWD: TeamBrain123   # SYS/SYSTEM password; bootstrap_db.py reads it off the container
+      ORACLE_PWD: TeamBrain123 # SYS/SYSTEM password; bootstrap_db.py reads it off the container
     volumes:
       - oracle_data:/opt/oracle/oradata
     # No model mount needed: scripts/bootstrap_db.py streams the ONNX embedding

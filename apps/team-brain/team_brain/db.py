@@ -296,8 +296,16 @@ class DocumentDB:
 
     # --- writes (require INGEST identity) -----------------------------------
     def _require_ingest(self) -> None:
-        if self._identity != INGEST:
+        """Writes run in INGEST mode. A session with no identity is an operator session and
+        is switched; a session that already speaks for a caller is never silently escalated."""
+        if self._identity == INGEST:
+            return
+        if self._identity is None:
             self.set_identity(INGEST)
+            return
+        raise PermissionError(
+            f"write attempted on a session bound to {self._identity!r}; use an INGEST session"
+        )
 
     def upsert_document(self, doc: Document, embed_text: str | None = None) -> None:
         """Insert or update by (source, external_id). Resurrects if tombstoned.
@@ -553,7 +561,10 @@ class DocumentDB:
             )
             by_source = {r[0]: int(r[1]) for r in cur.fetchall()}
         finally:
-            if saved is not None and saved != INGEST:
+            if saved is None:
+                clear_identity(self._get_conn())
+                self._identity = None
+            elif saved != INGEST:
                 self.set_identity(saved)
         return {"live_documents": int(live), "tombstoned": int(tombstoned), "by_source": by_source}
 

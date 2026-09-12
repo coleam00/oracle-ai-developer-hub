@@ -5,8 +5,8 @@ That's the whole extension surface — everything downstream (embedding, hybrid
 retrieval, permissions, the agent, MCP) works the moment your rows land.
 
 **One connector per _source_, never per person.** A teammate is not a connector.
-Identity is a filter applied at query time (`requesting_user` against
-`visibility`/`acl`), so everyone queries the same brain and sees their own
+Identity is a property of the database session, and a row policy on the table
+filters every read by it, so everyone queries the same brain and sees their own
 permitted slice of it. See [PERSONAL_VS_TEAM.md](PERSONAL_VS_TEAM.md).
 
 ## Three steps
@@ -62,14 +62,14 @@ uv run team-brain ask "what did we decide about pricing?" --user alice
 
 ## The contract (what `fetch()` must guarantee)
 
-| Field | Rule |
-|-------|------|
-| `source` | matches your connector's `source` |
-| `external_id` | **stable** within the source — re-ingesting the same item updates in place, and anything you stop emitting gets tombstoned |
-| `created_at` | timezone-aware (use `datetime.now(UTC)` if the source has no date) |
-| `visibility` / `acl` | `"public"` for everyone; `"restricted"` + `acl=[members]` for private content. Restricted + empty `acl` = visible to nobody (fail-closed) |
-| `domains` | group-based access labels (e.g. `["ops"]`, `["ops","marketing"]`). Empty = company-wide. A caller sees a labeled doc only if their groups grant one of these domains. Stamp it from the source (a channel, a repo, a `--domain` arg), never from a person. Enforced at query time — see [PERSONAL_VS_TEAM.md](PERSONAL_VS_TEAM.md) and `team_brain/access.py` |
-| `metadata` | free-form; set `{"kind": "code"}` to make items show up in `search_code` |
+| Field                | Rule                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`             | matches your connector's `source`                                                                                                                                                                                                                                                                                                                             |
+| `external_id`        | **stable** within the source — re-ingesting the same item updates in place, and anything you stop emitting gets tombstoned                                                                                                                                                                                                                                    |
+| `created_at`         | timezone-aware (use `datetime.now(UTC)` if the source has no date)                                                                                                                                                                                                                                                                                            |
+| `visibility` / `acl` | `"public"` for everyone; `"restricted"` + `acl=[members]` for private content. Restricted + empty `acl` = visible to nobody (fail-closed)                                                                                                                                                                                                                     |
+| `domains`            | group-based access labels (e.g. `["ops"]`, `["ops","marketing"]`). Empty = company-wide. A caller sees a labeled doc only if their groups grant one of these domains. Stamp it from the source (a channel, a repo, a `--domain` arg), never from a person. Enforced at query time — see [PERSONAL_VS_TEAM.md](PERSONAL_VS_TEAM.md) and `team_brain/access.py` |
+| `metadata`           | free-form; set `{"kind": "code"}` to make items show up in `search_code`                                                                                                                                                                                                                                                                                      |
 
 `fetch()` returns a **full snapshot** of the current source state. Ingestion
 upserts everything you yield and tombstones anything for your `source` that you

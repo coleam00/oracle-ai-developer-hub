@@ -228,7 +228,9 @@ CREATE OR REPLACE PACKAGE BODY tb_session AS
     set_principal(v_username);
   END;
 
-  -- Raw username, no domain restriction (ACL-only). The workshop's legacy path.
+  -- Raw username with NO domain grant (ACL-only). It sees company-wide rows and
+  -- restricted rows whose acl names it; it never sees a domain-labelled row.
+  -- The workshop's legacy path, kept for undomained knowledge bases.
   PROCEDURE set_user(p_username IN VARCHAR2) IS
   BEGIN
     reset_;
@@ -236,7 +238,7 @@ CREATE OR REPLACE PACKAGE BODY tb_session AS
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'USERNAME', p_username);
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'DISPLAY_NAME', p_username);
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'DOMAINS', ',');
-    DBMS_SESSION.SET_CONTEXT(C_CTX, 'ALL_DOMAINS', 'Y');
+    DBMS_SESSION.SET_CONTEXT(C_CTX, 'ALL_DOMAINS', 'N');
   END;
 
   PROCEDURE set_anonymous IS

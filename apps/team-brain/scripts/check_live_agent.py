@@ -1,8 +1,7 @@
 """Live check: the LangChain agent answers as a seeded principal with a real LLM.
 
-Loads an OpenRouter key from Cole's content-engine env file at runtime (the key
-never enters the terminal). Runs against the TEST schema, which the parity
-script leaves seeded with four documents.
+Needs an LLM key in the environment or in `.env` (LLM_API_KEY or OPENROUTER_API_KEY).
+Runs against the TEST schema and seeds four documents itself.
 """
 
 from __future__ import annotations
@@ -12,12 +11,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-for candidate in (
-    Path(r"C:\Users\colem\dynamous-engine\content-engine\.env"),
-    Path.home() / ".archon" / ".env",
-):
-    if candidate.exists():
-        load_dotenv(candidate, override=False)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 os.environ.setdefault("ORACLE_USER", "TEAMBRAIN_TEST")
 
 from team_brain.access import AccessControl, Identity, load_access_spec, seed_access  # noqa: E402

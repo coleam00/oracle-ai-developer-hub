@@ -4,11 +4,11 @@ Full table backing `sales/deal-desk-policy.md`. All figures are off list
 price.
 
 | Contract length | Payment terms | Max discount (no approval) | Max discount (VP sign-off) |
-|---|---|---|---|
-| Annual | Upfront | 20% | 25% |
-| Annual | Quarterly | 15% | 20% |
-| 2-year | Upfront | 25% | 30% |
-| 3-year | Upfront | 25% | 30% |
+| --------------- | ------------- | -------------------------- | -------------------------- |
+| Annual          | Upfront       | 20%                        | 25%                        |
+| Annual          | Quarterly     | 15%                        | 20%                        |
+| 2-year          | Upfront       | 25%                        | 30%                        |
+| 3-year          | Upfront       | 25%                        | 30%                        |
 
 Notes:
 

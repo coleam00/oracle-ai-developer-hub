@@ -12,9 +12,9 @@ identity check deleted, because the enforcement lives in the database itself:
   (d) the raw-SQL retrieval legs (`keyword_search_sql` / `vector_search_sql`)
       and the LangChain legs (`langchain_legs.keyword_leg` / `vector_leg`)
       return identical (id, score) lists for the same query/identity/project —
-      both are plain SQL over the same policy-protected table. This is a
-      proper test version of the old scripts/_parity.py dev script (now
-      deleted; scripts/_smoke.py, _live_agent.py, _mcp_check.py are untouched).
+      both are plain SQL over the same policy-protected table.
+  (e) a raw username (`Identity.user`) has no domain grant: it never sees a
+      domain-labelled row, so the CLI default identity cannot bypass the demo.
 """
 
 from __future__ import annotations
@@ -145,3 +145,20 @@ def test_sql_and_langchain_legs_agree(db: DocumentDB, tokens: dict[str, str]) ->
                 lc_v = _pairs(lc.vector_leg(db, q, proj, 10))
                 assert sql_kw == lc_kw, (who, q, proj, "keyword", sql_kw, lc_kw)
                 assert sql_v == lc_v, (who, q, proj, "vector", sql_v, lc_v)
+
+
+def test_raw_user_has_no_domain_grant(db: DocumentDB) -> None:
+    """`Identity.user` (the CLI default) is ACL-only: company-wide rows yes, domain rows never."""
+    now = datetime.now(UTC)
+    db.upsert_document(Document("md", "public", "Deploy runbook", "blue-green deploy steps", now))
+    db.upsert_document(
+        Document("md", "sales", "Deal desk", "discount ceiling policy", now, domains=["sales"])
+    )
+    db.commit()
+
+    db.set_identity(Identity.user("demo"))
+    assert db.visible_count() == 1
+    ids = {r["id"] for r in db.keyword_search("discount ceiling policy", None, limit=5)}
+    assert "md::sales" not in ids
+    ids = {r["id"] for r in db.keyword_search("deploy steps", None, limit=5)}
+    assert "md::public" in ids

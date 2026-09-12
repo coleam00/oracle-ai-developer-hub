@@ -12,16 +12,16 @@ tries to be shared infrastructure.
 
 **Your second brain is _who_. The team brain is _what_.**
 
-| | Personal Second Brain | Team Brain |
-|---|---|---|
-| What it is | an **agent** | a **substrate** |
-| Has a personality | yes (`SOUL.md`) | **no, deliberately** |
-| Knows who you are | yes, deeply | only enough to filter what you may see |
-| Curation | you, by hand | nobody; it meets data where it lives |
-| Proactive | yes (heartbeats, reflection, drafts) | no, it answers when asked |
-| Acts on your behalf | yes | no |
-| Trust boundary | everything in it is yours | everything in it is permissioned |
-| How many | one per person | one per team |
+|                     | Personal Second Brain                | Team Brain                             |
+| ------------------- | ------------------------------------ | -------------------------------------- |
+| What it is          | an **agent**                         | a **substrate**                        |
+| Has a personality   | yes (`SOUL.md`)                      | **no, deliberately**                   |
+| Knows who you are   | yes, deeply                          | only enough to filter what you may see |
+| Curation            | you, by hand                         | nobody; it meets data where it lives   |
+| Proactive           | yes (heartbeats, reflection, drafts) | no, it answers when asked              |
+| Acts on your behalf | yes                                  | no                                     |
+| Trust boundary      | everything in it is yours            | everything in it is permissioned       |
+| How many            | one per person                       | one per team                           |
 
 ## Why the team brain has no personality
 
@@ -40,7 +40,7 @@ That's why `mcp_server.py` deliberately ships **no `answer()` tool**. Only
 `search`, `search_code`, `who_knows`, and `get_document` (the full text of one
 result), all returning raw evidence rows.
 Cerebras made the same call in their production system and named it well:
-*LLM-free retrieval primitives*.
+_LLM-free retrieval primitives_.
 
 > **The team brain is personality-free _so that_ many personalities can consume it.**
 
@@ -50,12 +50,12 @@ This is the other half people miss. The team brain is not a passive store you
 drop text into. It carries real capability, and specifically it carries
 **policy** — the standing decisions about how team knowledge is treated:
 
-| Policy | Where | What it decides |
-|---|---|---|
-| **Ingestion policy** | `connectors/` | which sources count, how each maps into the shared contract, what gets tombstoned |
-| **Enrichment policy** | `enrich.py` | what a noisy thread actually *meant* before it's stored (question, resolution, systems) |
-| **Retrieval policy** | `retrieval.py` | what "relevant" means here: fuse keyword and vector by rank, decay by age, favor rare informative terms |
-| **Permission policy** | `access.py` (the database) | who may see what, enforced by a row policy on the table itself, on every read from any client |
+| Policy                | Where                      | What it decides                                                                                         |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Ingestion policy**  | `connectors/`              | which sources count, how each maps into the shared contract, what gets tombstoned                       |
+| **Enrichment policy** | `enrich.py`                | what a noisy thread actually _meant_ before it's stored (question, resolution, systems)                 |
+| **Retrieval policy**  | `retrieval.py`             | what "relevant" means here: fuse keyword and vector by rank, decay by age, favor rare informative terms |
+| **Permission policy** | `access.py` (the database) | who may see what, enforced by a row policy on the table itself, on every read from any client           |
 
 None of that is personality. It's **policy**, and policy is shared by
 definition.
@@ -114,17 +114,17 @@ thing all three can share.
   copies, N sync bugs, and permissions enforced N times. The ACL check belongs
   next to the data.
 - **"The team brain should learn my preferences."** That's your agent's job. The
-  moment the substrate has preferences, it has *someone's* preferences.
+  moment the substrate has preferences, it has _someone's_ preferences.
 - **"Let's add an `answer()` tool so it's easier to call."** Easier once, worse
   forever. You've just hard-coded one interpretation for every consumer.
 - **"Write a connector per teammate."** Connectors are per **source**, not per
-  person. Identity is a *property of the session* the database filters on,
+  person. Identity is a _property of the session_ the database filters on,
   never a separate store.
 
 ## One honest caveat in this POC
 
 `agent.py` does implement plan → execute → synthesize behind the CLI `ask`
-command, so this repo *can* produce an answer directly. That path exists for
+command, so this repo _can_ produce an answer directly. That path exists for
 people not driving from Claude Code, it is stateless and evidence-bound (answer
 only from retrieved rows, always cite), and the MCP path attendees actually use
 bypasses it. It's a convenience, not a character.

@@ -21,13 +21,7 @@
       "name": "engineering",
       "is_private": false,
       "domains": [],
-      "members": [
-        "U_ALICE",
-        "U_CARLA",
-        "U_DAVE",
-        "U_JEFF",
-        "U_BOB"
-      ],
+      "members": ["U_ALICE", "U_CARLA", "U_DAVE", "U_JEFF", "U_BOB"],
       "threads": [
         {
           "thread_ts": "1786000000.000100",
@@ -150,14 +144,8 @@
       "id": "C_OPS",
       "name": "ops-team",
       "is_private": false,
-      "domains": [
-        "ops"
-      ],
-      "members": [
-        "U_JEFF",
-        "U_ELENA",
-        "U_BRIAN"
-      ],
+      "domains": ["ops"],
+      "members": ["U_JEFF", "U_ELENA", "U_BRIAN"],
       "threads": [
         {
           "thread_ts": "1786500000.000100",
@@ -245,15 +233,8 @@
       "id": "C_MKT",
       "name": "marketing-team",
       "is_private": false,
-      "domains": [
-        "marketing"
-      ],
-      "members": [
-        "U_JULIA",
-        "U_INES",
-        "U_PRIYA",
-        "U_BRIAN"
-      ],
+      "domains": ["marketing"],
+      "members": ["U_JULIA", "U_INES", "U_PRIYA", "U_BRIAN"],
       "threads": [
         {
           "thread_ts": "1787000000.000100",
@@ -341,15 +322,8 @@
       "id": "C_SALES",
       "name": "sales-team",
       "is_private": false,
-      "domains": [
-        "sales"
-      ],
-      "members": [
-        "U_SAM",
-        "U_FRANK",
-        "U_PRIYA",
-        "U_BRIAN"
-      ],
+      "domains": ["sales"],
+      "members": ["U_SAM", "U_FRANK", "U_PRIYA", "U_BRIAN"],
       "threads": [
         {
           "thread_ts": "1787500000.000100",
@@ -442,14 +416,8 @@
       "id": "C_FIN",
       "name": "finance",
       "is_private": false,
-      "domains": [
-        "finance"
-      ],
-      "members": [
-        "U_BOB",
-        "U_GRACE",
-        "U_BRIAN"
-      ],
+      "domains": ["finance"],
+      "members": ["U_BOB", "U_GRACE", "U_BRIAN"],
       "threads": [
         {
           "thread_ts": "1788000000.000100",
@@ -538,10 +506,7 @@
       "name": "leadership",
       "is_private": true,
       "domains": [],
-      "members": [
-        "U_BRIAN",
-        "U_JULIA"
-      ],
+      "members": ["U_BRIAN", "U_JULIA"],
       "threads": [
         {
           "thread_ts": "1788400000.000100",
@@ -584,13 +549,8 @@
       "id": "C_SEC",
       "name": "security-incidents",
       "is_private": true,
-      "domains": [
-        "ops"
-      ],
-      "members": [
-        "U_BRIAN",
-        "U_JEFF"
-      ],
+      "domains": ["ops"],
+      "members": ["U_BRIAN", "U_JEFF"],
       "threads": [
         {
           "thread_ts": "1788500000.000100",
@@ -634,16 +594,7 @@
       "name": "random",
       "is_private": false,
       "domains": [],
-      "members": [
-        "U_ALICE",
-        "U_BOB",
-        "U_CARLA",
-        "U_DAVE",
-        "U_JEFF",
-        "U_JULIA",
-        "U_SAM",
-        "U_BRIAN"
-      ],
+      "members": ["U_ALICE", "U_BOB", "U_CARLA", "U_DAVE", "U_JEFF", "U_JULIA", "U_SAM", "U_BRIAN"],
       "threads": [
         {
           "thread_ts": "1786800000.000100",
