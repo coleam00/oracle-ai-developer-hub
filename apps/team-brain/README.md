@@ -53,6 +53,13 @@ uv run team-brain ask "what is our enterprise discount ceiling?" --as sam    # s
 uv run team-brain ask "what is our enterprise discount ceiling?" --token tb_exec_brian_9d4c7b13
 ```
 
+Want to watch the table fill in a browser? Run Oracle's REST Data Services container next to the database and REST-enable the app schema once, then sign in to Database Actions as `TEAMBRAIN` at `http://localhost:8181/ords/sql-developer`:
+
+```bash
+docker run -d --name team-brain-ords -p 8181:8080   -e ORACLE_PWD=TeamBrain123 -e ORACLE_USER_PWD=TeamBrain123   -e DBHOST=<database container IP> -e DBPORT=1521 -e DBSERVICENAME=FREEPDB1   container-registry.oracle.com/database/ords:latest
+uv run python scripts/enable_rest.py
+```
+
 The one-liner that shows the lock is on the rows, not in the app:
 
 ```sql
