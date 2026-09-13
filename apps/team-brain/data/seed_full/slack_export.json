@@ -1,4 +1,20 @@
 {
+  "principal_map": {
+    "U_ALICE": "alice",
+    "U_BOB": "bob",
+    "U_CARLA": "carla",
+    "U_DAVE": "dave",
+    "U_JEFF": "jeff",
+    "U_ELENA": "elena",
+    "U_JULIA": "julia",
+    "U_INES": "ines",
+    "U_SAM": "sam",
+    "U_FRANK": "frank",
+    "U_PRIYA": "priya",
+    "U_GRACE": "grace",
+    "U_HENRY": "henry",
+    "U_BRIAN": "brian"
+  },
   "users": {
     "U_ALICE": "alice",
     "U_BOB": "bob",

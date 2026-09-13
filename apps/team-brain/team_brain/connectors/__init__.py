@@ -75,13 +75,24 @@ register("github", _build_github)
 
 # --- slack ---
 def _build_slack(args: list[str]) -> Connector:
+    import argparse
+    import json
+    from pathlib import Path
+
     from team_brain.connectors.slack import SlackConnector
 
-    # `ingest slack --export path.json`  or  `ingest slack` (live via SLACK_BOT_TOKEN)
-    export = None
-    if args and args[0] == "--export" and len(args) > 1:
-        export = args[1]
-    return SlackConnector(export_path=export)
+    parser = argparse.ArgumentParser(prog="team-brain ingest slack")
+    parser.add_argument("--export")
+    parser.add_argument(
+        "--identity-map", help="operator-owned JSON mapping Slack IDs to principals"
+    )
+    options = parser.parse_args(args)
+    mapping = (
+        json.loads(Path(options.identity_map).read_text(encoding="utf-8"))
+        if options.identity_map
+        else None
+    )
+    return SlackConnector(export_path=options.export, principal_map=mapping)
 
 
 register("slack", _build_slack)

@@ -91,6 +91,11 @@ def keyword_leg(
     db: DocumentDB, query: str, project: str | None, limit: int
 ) -> list[dict[str, Any]]:
     """Oracle Text CONTAINS over title + text, ranked by SCORE."""
+    if project is not None:
+        # OracleTextSearchRetriever 1.5 has no predicate/filter argument.
+        # Use our bound SQL on the same session so project filtering precedes
+        # TOP K; finite over-fetching can silently lose every matching row.
+        return db.keyword_search_sql(query, project, limit)
     terms = ["".join(ch for ch in t if ch.isalnum()) for t in _strip_stop_words(query)]
     terms = [t for t in terms if t]
     if not terms:
@@ -99,7 +104,7 @@ def keyword_leg(
         client=db.connection,
         table_name=TABLE,
         column_name="TEXT",
-        k=limit * 3 if project else limit,
+        k=limit,
         return_scores=True,
         returned_columns=["METADATA"],
     )
@@ -107,8 +112,6 @@ def keyword_leg(
     rows: list[dict[str, Any]] = []
     for doc in docs:
         md = dict(doc.metadata.get("metadata") or {})
-        if project and md.get("project") != project:
-            continue
         # Oracle Text SCORE is 0..100; normalise to 0..1 like the SQL leg.
         rows.append(_row(md, doc.page_content, float(doc.metadata.get("score") or 0) / 100.0))
     return rows[:limit]

@@ -4,7 +4,7 @@ Proves the ENFORCE-side inputs are correct: a token resolves to the right
 principal, groups expand to the right domains, leadership is all-domains, and
 an unknown token resolves to nothing (fail closed). Unchanged in intent by the
 Oracle port — AccessControl's public API (resolve_token/get_principal/
-list_principals) is the same shape as the Postgres edition.
+list_principals) is the same shape as the workshop version.
 """
 
 from __future__ import annotations

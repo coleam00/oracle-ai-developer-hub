@@ -27,7 +27,7 @@ import pytest
 from team_brain import langchain_legs as lc
 from team_brain.access import AccessError, Identity
 from team_brain.config import ORACLE_DSN, ORACLE_PASSWORD, ORACLE_USER
-from team_brain.db import DocumentDB
+from team_brain.db import DocumentDB, IdentityError
 from team_brain.schema import Document
 
 
@@ -71,6 +71,68 @@ def test_unknown_token_and_principal_are_rejected(db: DocumentDB) -> None:
         db.set_identity(Identity.token("bogus"))
     with pytest.raises(AccessError):
         db.set_identity(Identity.principal("nobody"))
+
+
+@pytest.mark.parametrize("initial", ["brian", "ingest"])
+@pytest.mark.parametrize(
+    "procedure,value,code",
+    [("set_principal_by_token", "bogus", 20402), ("set_principal", "nobody", 20401)],
+)
+def test_failed_authentication_clears_raw_database_context(
+    db: DocumentDB, tokens: dict[str, str], initial: str, procedure: str, value: str, code: int
+) -> None:
+    db.upsert_document(
+        Document("md", "secret", "Secret", "sales policy", datetime.now(UTC), domains=["sales"])
+    )
+    db.commit()
+    with _raw_connection() as conn:
+        cur = conn.cursor()
+        if initial == "ingest":
+            cur.callproc("tb_session.set_ingest")
+        else:
+            cur.callproc("tb_session.set_principal", [initial])
+        cur.execute("SELECT COUNT(*) FROM documents")
+        assert cur.fetchone()[0] == 1
+        with pytest.raises(oracledb.DatabaseError) as error:
+            cur.callproc(f"tb_session.{procedure}", [value])
+        assert error.value.args[0].code == code
+        cur.execute("SELECT COUNT(*) FROM documents")
+        assert cur.fetchone()[0] == 0
+        cur.execute(f"SELECT SYS_CONTEXT('{db.context_name}', 'MODE') FROM dual")
+        assert cur.fetchone()[0] is None
+        cur.callproc("tb_session.set_principal", ["brian"])
+        cur.execute("SELECT COUNT(*) FROM documents")
+        assert cur.fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_failed_python_identity_cannot_read_or_silently_become_ingest(
+    db: DocumentDB, tokens: dict[str, str], lazy: bool
+) -> None:
+    doc = Document("md", "secret", "Secret", "sales policy", datetime.now(UTC), domains=["sales"])
+    db.upsert_document(doc)
+    db.commit()
+    reader = DocumentDB(identity=Identity.token("bogus") if lazy else Identity.principal("brian"))
+    try:
+        if lazy:
+            with pytest.raises(AccessError):
+                _ = reader.connection
+        else:
+            assert reader.visible_count() == 1
+            with pytest.raises(AccessError):
+                reader.set_identity(Identity.token("bogus"))
+        assert reader.identity is None
+        with pytest.raises(IdentityError):
+            reader.get_document("md::secret")
+        with pytest.raises(PermissionError):
+            reader.upsert_document(doc)
+        cur = reader.connection.cursor()
+        cur.execute("SELECT COUNT(*) FROM documents")
+        assert cur.fetchone()[0] == 0
+        reader.set_identity(Identity.principal("brian"))
+        assert reader.visible_count() == 1
+    finally:
+        reader.close()
 
 
 _PARITY_DOCS = [
@@ -162,3 +224,41 @@ def test_raw_user_has_no_domain_grant(db: DocumentDB) -> None:
     assert "md::sales" not in ids
     ids = {r["id"] for r in db.keyword_search("deploy steps", None, limit=5)}
     assert "md::public" in ids
+
+
+def test_project_keyword_filter_precedes_limit(db: DocumentDB) -> None:
+    now = datetime.now(UTC)
+    for i in range(5):
+        db.upsert_document(
+            Document(
+                "md",
+                f"other-{i}",
+                "quasar nebula pulsar",
+                "quasar nebula pulsar " * 20,
+                now,
+                project="elsewhere",
+            )
+        )
+    db.upsert_document(
+        Document("md", "target", "quasar", "quasar ordinary text", now, project="desired")
+    )
+    db.upsert_document(
+        Document(
+            "md",
+            "secret",
+            "quasar nebula pulsar",
+            "quasar nebula pulsar",
+            now,
+            project="desired",
+            visibility="restricted",
+            acl=["member"],
+        )
+    )
+    db.commit()
+    db.set_identity(Identity.anonymous())
+    expected = db.keyword_search_sql("quasar nebula pulsar", "desired", 1)
+    actual = lc.keyword_leg(db, "quasar nebula pulsar", "desired", 1)
+    assert [r["id"] for r in expected] == ["md::target"]
+    assert _pairs(actual) == _pairs(expected)
+    assert lc.keyword_leg(db, "quasar", "missing", 1) == []
+    assert lc.keyword_leg(db, "quasar", "desired' OR '1'='1", 1) == []

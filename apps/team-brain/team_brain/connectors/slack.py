@@ -39,9 +39,27 @@ def _ts_to_dt(ts: str) -> datetime:
 class SlackConnector:
     source = "slack"
 
-    def __init__(self, export_path: str | None = None, project: str = "default") -> None:
+    def __init__(
+        self,
+        export_path: str | None = None,
+        project: str = "default",
+        principal_map: dict[str, str] | None = None,
+    ) -> None:
         self.export_path = export_path
         self.project = project
+        self.principal_map = self._validate_principal_map(
+            {} if principal_map is None else principal_map
+        )
+        self._explicit_principal_map = principal_map is not None
+
+    @staticmethod
+    def _validate_principal_map(value: object) -> dict[str, str]:
+        if not isinstance(value, dict) or any(
+            not isinstance(k, str) or not k.strip() or not isinstance(v, str) or not v.strip()
+            for k, v in value.items()
+        ):
+            raise ValueError("principal_map must map nonempty Slack user IDs to principal names")
+        return dict(value)
 
     def fetch(self) -> Iterable[Document]:
         if self.export_path:
@@ -75,7 +93,9 @@ class SlackConnector:
         title = (enriched or {}).get("question") or (first.get("text", "")[:120] or "thread")
 
         visibility = VISIBILITY_RESTRICTED if is_private else VISIBILITY_PUBLIC
-        acl = [user_names.get(u, u) for u in members] if is_private else []
+        # Names are display text only. Only an operator-supplied ID mapping
+        # may translate a source identity into a Team Brain principal.
+        acl = [self.principal_map.get(u, u) for u in members] if is_private else []
 
         return Document(
             source=self.source,
@@ -103,6 +123,8 @@ class SlackConnector:
         if not path.exists():
             raise FileNotFoundError(f"slack export not found: {path}")
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not self._explicit_principal_map:
+            self.principal_map = self._validate_principal_map(data.get("principal_map", {}))
         user_names: dict[str, str] = data.get("users", {})
         for ch in data.get("channels", []):
             for thread in ch.get("threads", [])[:_MAX_THREADS_PER_CHANNEL]:

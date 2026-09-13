@@ -2,13 +2,11 @@
 # full-text index, the in-database embedding model, and the row policy all live
 # in this one container.
 #
-#   docker compose up -d                 # first boot takes a few minutes
+#   docker compose up -d --wait --wait-timeout 900
 #   uv run python scripts/bootstrap_db.py   # users, grants, embedding model
 #
 # Pulling container-registry.oracle.com/database/free needs a free Oracle
 # account (accept the licence once, then `docker login container-registry.oracle.com`).
-# `gvenzl/oracle-free:23` works without a login; use the regular (not slim)
-# flavour so Oracle Text is present, and set ORACLE_PASSWORD instead of ORACLE_PWD.
 services:
   oracle:
     image: container-registry.oracle.com/database/free:latest
@@ -27,6 +25,37 @@ services:
       timeout: 10s
       retries: 20
       start_period: 120s
+
+  ords:
+    profiles: ["browser"]
+    image: container-registry.oracle.com/database/ords:latest
+    container_name: team-brain-ords
+    ports:
+      - "8181:8080"
+    environment:
+      ORACLE_PWD: TeamBrain123
+      ORACLE_USER_PWD: TeamBrain123
+      DBHOST: oracle
+      DBPORT: 1521
+      DBSERVICENAME: FREEPDB1
+    depends_on:
+      oracle:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--output",
+          "/dev/null",
+          "http://localhost:8080/ords/sql-developer",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 30s
 
 volumes:
   oracle_data:

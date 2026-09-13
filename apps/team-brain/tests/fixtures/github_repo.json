@@ -1,5 +1,5 @@
 {
-  "repo": { "default_branch": "main", "pushed_at": "2026-05-01T00:00:00Z" },
+  "repo": { "private": false, "default_branch": "main", "pushed_at": "2026-05-01T00:00:00Z" },
   "readme_text": "# Widgets\n\nWidgets computes money with banker's rounding and retries flaky fetches.",
   "readme_html_url": "https://github.com/acme/widgets/blob/main/README.md",
   "issues": [

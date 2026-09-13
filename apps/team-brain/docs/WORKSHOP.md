@@ -17,8 +17,17 @@ engagement.
 Retrieval quality, enrichment, and permissions are the policy that makes the
 substrate worth sharing. They are co-equal beats under (2).
 
-**Setup (do before the session):** `docker compose up -d && uv sync --extra dev`,
-then `uv run team-brain doctor` should be all-green. Have Claude Code installed.
+**Setup (do before the session):** complete the prerequisites in [Quick start](../README.md#quick-start), then run:
+
+```bash
+docker compose up -d --wait --wait-timeout 900
+uv sync --extra dev --locked
+uv run python scripts/bootstrap_db.py
+uv run team-brain doctor
+uv run team-brain access seed
+```
+
+Have Claude Code installed. Bootstrap creates both app and test users and loads the embedding model. `doctor` validates the test schema; `access seed` prepares the app principals required by the included MCP configuration. Add the workshop knowledge through the ingestion steps below.
 
 ## Run of show
 

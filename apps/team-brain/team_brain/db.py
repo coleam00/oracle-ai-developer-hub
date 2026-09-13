@@ -100,6 +100,7 @@ class DocumentDB:
         self._dsn = dsn or ORACLE_DSN
         self._conn: Any = None
         self._identity: Identity | None = identity
+        self._identity_failed = False
         self._schema: str | None = None
 
     # --- connection ---------------------------------------------------------
@@ -108,9 +109,16 @@ class DocumentDB:
             import oracledb
 
             oracledb.defaults.fetch_lobs = False
-            self._conn = oracledb.connect(user=self._user, password=self._password, dsn=self._dsn)
-            if self._identity is not None:
-                apply_identity(self._conn, self._identity)
+            conn = oracledb.connect(user=self._user, password=self._password, dsn=self._dsn)
+            try:
+                if self._identity is not None:
+                    apply_identity(conn, self._identity)
+            except Exception:
+                conn.close()
+                self._identity = None
+                self._identity_failed = True
+                raise
+            self._conn = conn
         return self._conn
 
     @property
@@ -131,6 +139,10 @@ class DocumentDB:
         if self._conn is not None:
             self._conn.commit()
 
+    def rollback(self) -> None:
+        if self._conn is not None:
+            self._conn.rollback()
+
     @property
     def schema(self) -> str:
         if self._schema is None:
@@ -146,8 +158,18 @@ class DocumentDB:
     # --- identity -----------------------------------------------------------
     def set_identity(self, identity: Identity) -> None:
         """Tell the database who is asking. Every read after this is filtered by it."""
+        self._identity = None
+        self._identity_failed = True
+        conn = self._get_conn()
+        try:
+            apply_identity(conn, identity)
+        except Exception:
+            # Discard a failed session even if the failure was not an auth error.
+            # The PL/SQL package also clears context for direct SQL callers.
+            self.close()
+            raise
         self._identity = identity
-        apply_identity(self._get_conn(), identity)
+        self._identity_failed = False
 
     @property
     def identity(self) -> Identity | None:
@@ -300,12 +322,10 @@ class DocumentDB:
         is switched; a session that already speaks for a caller is never silently escalated."""
         if self._identity == INGEST:
             return
-        if self._identity is None:
+        if self._identity is None and not self._identity_failed:
             self.set_identity(INGEST)
             return
-        raise PermissionError(
-            f"write attempted on a session bound to {self._identity!r}; use an INGEST session"
-        )
+        raise PermissionError("write attempted without an operator identity; use an INGEST session")
 
     def upsert_document(self, doc: Document, embed_text: str | None = None) -> None:
         """Insert or update by (source, external_id). Resurrects if tombstoned.

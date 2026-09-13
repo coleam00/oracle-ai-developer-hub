@@ -1,4 +1,5 @@
 {
+  "principal_map": { "U_ALICE": "alice", "U_BOB": "bob", "U_CARLA": "carla" },
   "users": {
     "U_ALICE": "alice",
     "U_BOB": "bob",

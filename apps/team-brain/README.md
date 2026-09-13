@@ -26,11 +26,13 @@ The long version, including what this rules out, is in [docs/PERSONAL_VS_TEAM.md
 
 ## Quick start
 
+Install Docker with Compose v2 (including `--wait`) and `uv`. Python 3.12 or newer is required; `uv` can install it. Allow several minutes for the first database boot and a roughly 117 MB embedding-model download during bootstrap. Pulling the Oracle image requires accepting its licence with a free Oracle account and running `docker login container-registry.oracle.com` first. Ports 1521 and, for the optional browser, 8181 must be free.
+
 ```bash
 git clone https://github.com/oracle-devrel/oracle-ai-developer-hub.git
 cd oracle-ai-developer-hub/apps/team-brain
-docker compose up -d                    # Oracle AI Database 26ai Free; first boot takes a few minutes
-uv sync --extra dev
+docker compose up -d --wait --wait-timeout 900  # wait for the database health check
+uv sync --extra dev --locked
 uv run python scripts/bootstrap_db.py   # app users, grants, and the in-database embedding model
 
 # Ingest some knowledge (offline, no API key: embeddings happen in the database)
@@ -53,11 +55,30 @@ uv run team-brain ask "what is our enterprise discount ceiling?" --as sam    # s
 uv run team-brain ask "what is our enterprise discount ceiling?" --token tb_exec_brian_9d4c7b13
 ```
 
-Want to watch the table fill in a browser? Run Oracle's REST Data Services container next to the database and REST-enable the app schema once, then sign in to Database Actions as `TEAMBRAIN` at `http://localhost:8181/ords/sql-developer`:
+For Database Actions in a browser, run this after the quick start. The optional Compose profile installs Oracle REST Data Services (ORDS), connects it to `oracle` on the shared Compose network, and waits for its HTTP endpoint before enabling the app schema:
 
 ```bash
-docker run -d --name team-brain-ords -p 8181:8080   -e ORACLE_PWD=TeamBrain123 -e ORACLE_USER_PWD=TeamBrain123   -e DBHOST=<database container IP> -e DBPORT=1521 -e DBSERVICENAME=FREEPDB1   container-registry.oracle.com/database/ords:latest
+docker compose --profile browser up -d --wait --wait-timeout 1200
 uv run python scripts/enable_rest.py
+```
+
+Sign in as `TEAMBRAIN` with the demo password `TeamBrain123` at `http://localhost:8181/ords/sql-developer`. The table's Columns tab shows its structure. Its Data tab normally shows no rows because the browser has not established a Team Brain identity.
+
+To inspect permitted rows, run the following as one script in the SQL worksheet (F5), then open Script Output. Identity setup, reads, and cleanup stay in the same database call because ORDS pools connections. Use `brian` instead of `jeff` to inspect the leadership view. These named identity setters are trusted operator actions in this demo.
+
+```sql
+SET SERVEROUTPUT ON
+BEGIN
+  tb_session.set_principal('jeff');
+  FOR r IN (SELECT source, title FROM documents ORDER BY source, title) LOOP
+    DBMS_OUTPUT.PUT_LINE(r.source || ': ' || r.title);
+  END LOOP;
+  tb_session.clear;
+EXCEPTION WHEN OTHERS THEN
+  tb_session.clear;
+  RAISE;
+END;
+/
 ```
 
 The one-liner that shows the lock is on the rows, not in the app:
@@ -67,7 +88,7 @@ The one-liner that shows the lock is on the rows, not in the app:
 SELECT COUNT(*) FROM documents;   -- 0
 ```
 
-Pulling `container-registry.oracle.com/database/free` needs a free Oracle account (accept the licence once, then `docker login container-registry.oracle.com`). `gvenzl/oracle-free:23` works with no login; use the regular flavour (not `slim`) so Oracle Text is present, and set `ORACLE_PASSWORD` instead of `ORACLE_PWD`. The test suite uses its own schema (`TEAMBRAIN_TEST`) so it never touches your dev knowledge base.
+If startup times out, check `docker compose ps` and `docker compose logs oracle` (or `ords` for the browser profile), resolve the reported error, then rerun the same command. Bootstrap is idempotent. The test suite uses its own schema (`TEAMBRAIN_TEST`) so it never touches your dev knowledge base.
 
 ## Query it from Claude Code (MCP)
 
@@ -75,7 +96,9 @@ Two transports, same tools, same policy.
 
 **Local, stdio** (one identity per process): `.mcp.json` in this folder runs the server with a token in `env`, so open Claude Code in `apps/team-brain` for it to be picked up. Swap the token to change who Claude Code is.
 
-**Remote service, HTTP** (one identity per request): `uv run team-brain serve` starts the server on `http://127.0.0.1:8765/mcp`. Clients send `Authorization: Bearer <token>`. The client config holds the URL and the token, never the database credential. This is the shape a real deployment takes: the service is the only thing that holds the database password, and it never gets to decide who sees what, because the database decides.
+Run `uv run team-brain access seed` first; the included configuration uses Jeff's demo token. A local stdio process runs on the operator's machine and can access its database credentials. Use HTTP when teammates should receive only tokens.
+
+**Remote service, HTTP** (one identity per request): `uv run team-brain serve` starts the server on `http://127.0.0.1:8765/mcp`. Clients send `Authorization: Bearer <token>`. The client config holds the URL and the token, never the database credential. Each tool opens a fresh database session and submits the token for the database to resolve. The service is trusted in this single-schema demo because it holds the owner credential; see the production separation below.
 
 ```json
 {
@@ -106,6 +129,8 @@ clients:   Claude Code over MCP (stdio or HTTP) | LangChain agent (`team-brain a
 
 Implement `fetch()`, register it, run `ingest`. See [docs/WRITE_A_CONNECTOR.md](docs/WRITE_A_CONNECTOR.md).
 
+For Slack, private-channel ACLs use immutable Slack user IDs by default. Names in `users` are display text only. If your Team Brain principals have different IDs, create an operator-owned JSON mapping such as `{"U012345": "alice", "U067890": "bob"}` and pass `--identity-map slack-identities.json` to `team-brain ingest slack`, with or without `--export`. Only map IDs whose ownership you have verified; keep mappings separate per workspace. The sample export format also accepts a top-level `principal_map`, which the bundled fixtures use to preserve the demo identities. A command-line mapping overrides that field. Re-ingest an existing Slack snapshot after adopting this change to replace old name-based ACLs; changing code alone does not rewrite stored rows.
+
 ## Prove it works
 
 `uv run team-brain doctor` (see `scripts/validate.py`) runs the static checks, the whole test suite against the test schema, and a real ingest, ask, and eval with a permission-leak assertion. The suite includes a module that proves the database-level facts: no identity means zero rows, the context cannot be written directly, unknown tokens are refused inside the database, a raw username never sees a domain-labelled row, and the LangChain legs match the SQL legs row for row.
@@ -114,7 +139,11 @@ Implement `fetch()`, register it, run `ingest`. See [docs/WRITE_A_CONNECTOR.md](
 
 - Tokens are static, stored as unsalted SHA-256, and printed by `access seed` so you can paste them into a client. A production deployment issues short-lived tokens from an identity provider. The enforcement model does not change.
 - The default database password (`TeamBrain123`) and the seeded tokens are demo values. Change both before anything leaves your laptop.
-- Single-schema demo: the app connects as the schema owner, who also owns `tb_session` and the policy, so that credential can call `set_ingest` or drop the policy. Production puts the package, policy, and access tables in a separate policy-owner schema and grants the application user `EXECUTE` on `set_principal_by_token` only. The row policy and the fail-closed context are the same either way.
+- Single-schema demo: the app connects as the schema owner, who also owns `tb_session` and the policy. That credential can call `set_ingest`, assume a named principal, or drop the policy. This demonstrates filtering on ordinary reads and token-bearing MCP requests, not protection from the schema owner or a compromised service. Production needs a separate policy-owner schema and a restricted application user. Oracle grants `EXECUTE` on a whole package, so do not grant the application access to this demo's `tb_session` package. Expose a separate token-only wrapper API, keep the identity setters and ingest helpers inaccessible to the application, and let the trusted internal package write the context. Schema separation and grants require a separate deployment setup; this sample does not implement it.
+- GitHub repository visibility is read from the source. Private repositories always produce restricted rows, even if the connector was configured as public. With no ACL mapping, those rows are visible to nobody, including anonymous callers and principals with all domains. The CLI reports them in `fail_closed`; an operator can supply a trusted mapping through `GitHubConnector(..., acl=["alice", "bob"])`. Domains alone never grant access to private repositories. Rate limits, unavailable repositories, and incomplete responses abort the sync before tombstoning. Only a missing README is accepted as an optional absent item.
+- Ingestion replaces a complete snapshot per `source`. Two GitHub repos, two markdown roots, or two Slack exports using the same source replace each other's rows. Combine them in one connector snapshot or assign distinct source names before ingesting multiple collections. GitHub issues and code files are capped for this sample; it does not mirror an entire large repository.
+- Upserts, tombstones, and the success log commit together. A failed import rolls back document changes and records zero committed rows in its error log.
+- Project-scoped keyword searches use the bound SQL implementation on the same policy-filtered session because `OracleTextSearchRetriever` 1.5 does not support a project predicate. Unscoped keyword search and vector search use the LangChain retrievers.
 - Enrichment and the CLI agent call an LLM through an OpenAI-compatible endpoint. Without a key both degrade to deterministic offline behaviour, which is also why the test suite runs with no key.
 - Oracle AI Database Free is capped at 2 CPUs, 2 GB RAM, and 12 GB of data. Plenty for a team, not the sizing for a company.
 - Vector search here is exact. At scale you add a vector index and over-fetch, because the index builds its candidate set before the row policy filters it.

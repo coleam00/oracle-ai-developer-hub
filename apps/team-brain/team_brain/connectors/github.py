@@ -81,6 +81,7 @@ class GitHubConnector:
         self.visibility = visibility
         self.acl = acl or []
         self.domains = domains or []
+        self._repo_private = True  # fail closed until GitHub confirms visibility
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/vnd.github+json"}
@@ -91,8 +92,9 @@ class GitHubConnector:
     def fetch(self) -> Iterable[Document]:
         with httpx.Client(base_url=API, headers=self._headers(), timeout=30.0) as client:
             meta = self._get(client, f"/repos/{self.repo}")
-            if meta is None:
-                return
+            if not isinstance(meta, dict) or not isinstance(meta.get("private"), bool):
+                raise ValueError("GitHub repository response has no valid visibility flag")
+            self._repo_private = meta["private"]
             default_branch = meta.get("default_branch", "main")
             repo_dt = _parse_dt(meta.get("pushed_at"))
 
@@ -100,12 +102,13 @@ class GitHubConnector:
             yield from self._issues(client)
             yield from self._code(client, default_branch, repo_dt)
 
-    def _get(self, client: httpx.Client, path: str, **kwargs: Any) -> Any:
+    def _get(
+        self, client: httpx.Client, path: str, *, optional: bool = False, **kwargs: Any
+    ) -> Any:
         resp = client.get(path, **kwargs)
-        if resp.status_code == 403 and resp.headers.get("X-RateLimit-Remaining") == "0":
-            # Secondary/primary rate limit — stop gracefully rather than crash the run.
-            return None
-        if resp.status_code == 404:
+        # Only an absent README is a valid empty result. Authentication failures,
+        # rate limits, and missing required resources are incomplete snapshots.
+        if optional and resp.status_code == 404:
             return None
         resp.raise_for_status()
         return resp.json()
@@ -117,16 +120,18 @@ class GitHubConnector:
             title=title,
             body=body,
             project=self.project,
-            visibility=self.visibility,
+            visibility="restricted" if self._repo_private else self.visibility,
             acl=self.acl,
             domains=list(self.domains),
             **kw,  # type: ignore[arg-type]
         )
 
     def _readme(self, client: httpx.Client, repo_dt: datetime) -> Iterable[Document]:
-        data = self._get(client, f"/repos/{self.repo}/readme")
-        if not isinstance(data, dict):
+        data = self._get(client, f"/repos/{self.repo}/readme", optional=True)
+        if data is None:
             return
+        if not isinstance(data, dict) or "content" not in data:
+            raise ValueError("GitHub README response is incomplete")
         content = base64.b64decode(data.get("content", "")).decode("utf-8", errors="replace")
         yield self._doc(
             "readme",
@@ -144,7 +149,7 @@ class GitHubConnector:
             params={"state": "all", "per_page": 100},
         )
         if not isinstance(data, list):
-            return
+            raise ValueError("GitHub issues response is incomplete")
         for item in data[:_MAX_ISSUES]:
             is_pr = "pull_request" in item
             kind = "pr" if is_pr else "issue"
@@ -163,8 +168,10 @@ class GitHubConnector:
         tree = self._get(
             client, f"/repos/{self.repo}/git/trees/{branch}", params={"recursive": "1"}
         )
-        if not isinstance(tree, dict):
-            return
+        if not isinstance(tree, dict) or not isinstance(tree.get("tree"), list):
+            raise ValueError("GitHub tree response is incomplete")
+        if tree.get("truncated"):
+            raise ValueError("GitHub tree was truncated; refusing an incomplete snapshot")
         files = [
             n
             for n in tree.get("tree", [])
@@ -174,7 +181,7 @@ class GitHubConnector:
             path = node["path"]
             blob = self._get(client, f"/repos/{self.repo}/contents/{path}", params={"ref": branch})
             if not isinstance(blob, dict) or "content" not in blob:
-                continue
+                raise ValueError(f"GitHub content response is incomplete for {path}")
             text = base64.b64decode(blob["content"]).decode("utf-8", errors="replace")
             for i, chunk in enumerate(_chunk_code(text)):
                 yield self._doc(

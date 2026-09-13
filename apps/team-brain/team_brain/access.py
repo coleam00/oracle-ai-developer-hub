@@ -17,8 +17,8 @@ identity from an application context that ONLY a trusted PL/SQL package
 (`tb_session`) can write. So:
 
   * Any session that has not established an identity sees zero rows. That
-    includes the schema owner opening a SQL client. The workshop's "Jeff opens
-    psql and reads everything" bypass is gone, because the lock is on the rows.
+    includes the schema owner opening a SQL client without an identity. The
+    owner remains trusted: it can set INGEST mode or change the policy.
   * The application cannot forge an identity by writing the context directly;
     the kernel rejects it (ORA-01031). Identity goes through `tb_session`.
   * An unknown principal or an unknown token raises inside the database
@@ -60,7 +60,7 @@ class Identity:
 
     token      -> resolved by the database from mcp_tokens (the MCP path)
     principal  -> a username the database resolves to its group grant (CLI/tests)
-    user       -> a raw username with NO domain restriction, ACL-checked only
+    user       -> a raw username with NO domain grant, ACL-checked only
                   (the workshop's legacy `--user alice` path; still fail-closed
                   on restricted docs the user is not listed on)
     anonymous  -> a real identity with no grant: public, company-wide rows only
@@ -188,6 +188,7 @@ CREATE OR REPLACE PACKAGE BODY tb_session AS
     v_domains   VARCHAR2(4000) := ',';
     v_all       VARCHAR2(1) := 'N';
   BEGIN
+    reset_;
     BEGIN
       SELECT display_name, groups INTO v_display, v_groups
         FROM principals WHERE username = p_username;
@@ -214,18 +215,25 @@ CREATE OR REPLACE PACKAGE BODY tb_session AS
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'DISPLAY_NAME', v_display);
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'DOMAINS', v_domains);
     DBMS_SESSION.SET_CONTEXT(C_CTX, 'ALL_DOMAINS', v_all);
+  EXCEPTION WHEN OTHERS THEN
+    reset_;
+    RAISE;
   END;
 
   -- The MCP path: an opaque token, hashed by the caller, resolved here.
   PROCEDURE set_principal_by_token(p_token_hash IN VARCHAR2) IS
     v_username mcp_tokens.username%TYPE;
   BEGIN
+    reset_;
     BEGIN
       SELECT username INTO v_username FROM mcp_tokens WHERE token_hash = p_token_hash;
     EXCEPTION WHEN NO_DATA_FOUND THEN
       RAISE_APPLICATION_ERROR(-20402, 'unknown token');
     END;
     set_principal(v_username);
+  EXCEPTION WHEN OTHERS THEN
+    reset_;
+    RAISE;
   END;
 
   -- Raw username with NO domain grant (ACL-only). It sees company-wide rows and

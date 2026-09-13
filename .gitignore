@@ -194,6 +194,7 @@ build-paths/tests/*
 .playwright-mcp/
 .serena/
 **/.mcp.json
+!apps/team-brain/.mcp.json
 .claude/
 !workshops/soccer-analytics-agent/.claude/
 !workshops/soccer-analytics-agent/.claude/**

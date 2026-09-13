@@ -54,14 +54,13 @@ def ingest(source: str, args: list[str], db: DocumentDB | None = None) -> Ingest
             db.upsert_document(d, embedding_text(d.title, d.body, d.metadata.get("_enriched")))
             seen.add(d.external_id)
             upserted += 1
-        db.commit()
-
         tombstoned = db.tombstone_missing(source, seen)
-        db.commit()
+        # Commit the complete snapshot and its success log together.
         db.record_run_finish(run_id, upserted, tombstoned)
         return IngestResult(source, upserted, tombstoned, skipped)
     except Exception as exc:
-        db.record_run_finish(run_id, upserted, tombstoned, error=str(exc))
+        db.rollback()
+        db.record_run_finish(run_id, 0, 0, error=str(exc))
         raise
     finally:
         if owns_db:

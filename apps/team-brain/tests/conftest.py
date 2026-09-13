@@ -8,7 +8,7 @@ team_brain so config.py picks it up, force the LLM offline for determinism
 
 Identity lives in the DATABASE (see team_brain/access.py), not in Python, so
 these fixtures hand out `Identity` values (or a seeded {username: token} map)
-rather than raw usernames + domain lists the way the Postgres edition did.
+rather than the raw usernames and domain lists used by the workshop version.
 """
 
 from __future__ import annotations

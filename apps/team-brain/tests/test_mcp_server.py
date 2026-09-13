@@ -47,6 +47,32 @@ pytestmark = pytest.mark.asyncio
 _TIMEOUT = 60
 
 
+async def test_shipped_stdio_config_resolves_jeff(tokens: dict[str, str]) -> None:
+    """Exercise the portable project config that a fresh checkout actually ships."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    config = json.loads((REPO_DIR / ".mcp.json").read_text(encoding="utf-8"))
+    server = config["mcpServers"]["team-brain"]
+    assert server["env"]["TEAM_BRAIN_TOKEN"] == tokens["jeff"]
+    params = StdioServerParameters(
+        command=server["command"],
+        args=server["args"],
+        env={**_server_env(None), **server["env"]},
+        cwd=str(REPO_DIR),
+    )
+
+    async def run() -> None:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool("whoami", {})
+                assert not result.isError
+                assert _rows_dict(result)["username"] == "jeff"
+
+    await asyncio.wait_for(run(), timeout=_TIMEOUT)
+
+
 def _rows(result: Any) -> list[dict[str, Any]]:
     sc = getattr(result, "structuredContent", None)
     if isinstance(sc, dict) and "result" in sc:
